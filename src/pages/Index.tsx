@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,11 @@ interface Message {
   sender: "employee" | "client";
   time: string;
   isEncrypted: boolean;
+  file?: {
+    name: string;
+    size: string;
+    type: string;
+  };
 }
 
 interface Transaction {
@@ -35,6 +40,8 @@ const Index = () => {
 
   const [newMessage, setNewMessage] = useState("");
   const [notes, setNotes] = useState("Клиент интересовался досрочным погашением кредита 15.01.2026");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const client = {
     name: "Иванов Иван Петрович",
@@ -75,6 +82,44 @@ const Index = () => {
 
   const handleTemplateClick = (template: string) => {
     setNewMessage(template);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleFileAttach = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSendWithFile = () => {
+    if (selectedFile) {
+      const fileSize = (selectedFile.size / 1024).toFixed(1) + ' KB';
+      const fileType = selectedFile.type.split('/')[1]?.toUpperCase() || 'FILE';
+      
+      setMessages([
+        ...messages,
+        {
+          id: messages.length + 1,
+          text: newMessage || "Документ отправлен",
+          sender: "employee",
+          time: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+          isEncrypted: true,
+          file: {
+            name: selectedFile.name,
+            size: fileSize,
+            type: fileType,
+          },
+        },
+      ]);
+      setNewMessage("");
+      setSelectedFile(null);
+    } else {
+      handleSendMessage();
+    }
   };
 
   return (
@@ -120,6 +165,44 @@ const Index = () => {
                     }`}
                   >
                     <p className="text-sm leading-relaxed">{message.text}</p>
+                    {message.file && (
+                      <div className={`mt-3 p-3 rounded-lg flex items-center gap-3 ${
+                        message.sender === "employee" 
+                          ? "bg-white/20" 
+                          : "bg-gray-50"
+                      }`}>
+                        <div className={`p-2 rounded ${
+                          message.sender === "employee"
+                            ? "bg-white/30"
+                            : "bg-primary/10"
+                        }`}>
+                          <Icon name="FileText" size={20} className={message.sender === "employee" ? "text-white" : "text-primary"} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${
+                            message.sender === "employee" ? "text-white" : "text-gray-900"
+                          }`}>
+                            {message.file.name}
+                          </p>
+                          <p className={`text-xs ${
+                            message.sender === "employee" ? "text-white/70" : "text-gray-500"
+                          }`}>
+                            {message.file.type} · {message.file.size}
+                          </p>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={`h-8 w-8 ${
+                            message.sender === "employee"
+                              ? "text-white hover:bg-white/20"
+                              : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          <Icon name="Download" size={16} />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 px-2">
                     {message.isEncrypted && (
@@ -150,18 +233,43 @@ const Index = () => {
               ))}
             </div>
 
+            {selectedFile && (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <Icon name="FileText" size={20} className="text-green-600" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-green-900 truncate">{selectedFile.name}</p>
+                  <p className="text-xs text-green-600">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-green-600 hover:text-green-700"
+                  onClick={() => setSelectedFile(null)}
+                >
+                  <Icon name="X" size={16} />
+                </Button>
+              </div>
+            )}
+
             <div className="flex gap-2">
-              <Button variant="outline" size="icon">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              />
+              <Button variant="outline" size="icon" onClick={handleFileAttach}>
                 <Icon name="Paperclip" size={20} />
               </Button>
               <Input
                 placeholder="Введите сообщение..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                onKeyPress={(e) => e.key === "Enter" && handleSendWithFile()}
                 className="flex-1"
               />
-              <Button onClick={handleSendMessage}>
+              <Button onClick={handleSendWithFile}>
                 <Icon name="Send" size={20} />
               </Button>
             </div>
